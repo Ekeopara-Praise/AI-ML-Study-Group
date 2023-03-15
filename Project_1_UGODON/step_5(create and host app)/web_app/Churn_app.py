@@ -1,12 +1,17 @@
+
+import os
+import sys
+import subprocess
 import streamlit as st
 import pandas as pd
-
-import pandas as pd
+import gzip
+import dill
 import numpy as np
+
 
 st.write("""
 # Churn Prediction App
-choose your parameters from the sidebar and know if customer will **churn**
+click "**> button**" on the left hand corner and choose your parameters from the sidebar that appears to know if customer will **churn**
 """)
 
 
@@ -30,34 +35,37 @@ def user_input_features():
 
 df=user_input_features()
 
-st.subheader('Predicted Parameters')
+with gzip.open('churn_model.dill.gz', 'rb') as f:
+    model =dill.load(f)
+
+with gzip.open('rescale.dill.gz', 'rb') as f:
+    scale =dill.load(f)
+
+st.subheader('Prediction Parameters')
 st.write(df)
+
+st.write('click the predict button below to make prediction')
+button_clicked=False
+# Create a button
+button_clicked = st.button("Predict")
+# Check if the button is clicked
+if button_clicked:
     
-customers_data = pd.read_csv('customer_churn.csv')
-from sklearn.preprocessing import MinMaxScaler
+    u_value=scale.transform(df)
+    pred= model.predict(u_value)
+    pred_prob= model.predict_proba(u_value)
 
-scaler = MinMaxScaler(feature_range=(0, 1))
+    st.subheader('Probability Display')
+    st.write(pd.DataFrame({'won\'t churn':pred_prob[0][0],'churn':pred_prob[0][1]},index=['probability']))
 
-# Scale only the input data
-input_data = customers_data[['Age','Total_Purchase','Account_Manager', 'Years', 'Num_Sites']].to_numpy()
-data_scaled = scaler.fit_transform(input_data)
-data_scaled_df = pd.DataFrame (data_scaled, columns = ['Age','Total_Purchase','Account_Manager', 'Years', 'Num_Sites'])
+    classes={0:'won\'t churn',1:'churn'}
+    st.subheader('Predicted Action')
+    st.write('**{}**'.format(classes[pred[0]]))
 
-X = data_scaled_df
-y = customers_data['Churn']
+    st.subheader('Probability Display')
+    st.write(pd.DataFrame({'won\'t churn':pred_prob[0][0],'churn':pred_prob[0][1]},index=['probability']))
 
-from sklearn.ensemble import AdaBoostClassifier
-ada_model = AdaBoostClassifier(n_estimators=100,random_state=0)   # n_estimators=100, max_depth=10, random_state = 0)
-ada_model.fit(X, y)
-
-u_value=scaler.transform(df)
-pred= ada_model.predict(u_value)
-pred_prob= ada_model.predict_proba(u_value)
-
-st.subheader('Probability Display')
-st.write(pd.DataFrame({'won\'t churn':pred_prob[0][0],'churn':pred_prob[0][1]},index=['probability']))
-
-classes={0:'won\'t churn',1:'churn'}
-st.subheader('Predicted Action')
-st.write('**{}**'.format(classes[pred[0]]))
+    classes={0:'won\'t churn',1:'churn'}
+    st.subheader('Predicted Action')
+    st.write('**{}**'.format(classes[pred[0]]))
 
